@@ -26,9 +26,12 @@ class SorguModal(discord.ui.Modal):
         await interaction.response.send_message(f"🔍 `{self.input.value}` aranıyor...", ephemeral=True)
         
         val = self.input.value
-        if self.sorgu_tipi == "Instagram": url = f"https://cc-3t5u.onrender.com/inslookup.php?username={val}"
-        elif self.sorgu_tipi == "Domain": url = f"https://cc-3t5u.onrender.com/whoisapi.php?domain={val}"
-        else: url = f"https://cc-3t5u.onrender.com/emailspam.php?email={val}"
+        urls = {
+            "Instagram": f"https://cc-3t5u.onrender.com/inslookup.php?username={val}",
+            "Domain": f"https://cc-3t5u.onrender.com/whoisapi.php?domain={val}",
+            "Email": f"https://cc-3t5u.onrender.com/emailspam.php?email={val}"
+        }
+        url = urls.get(self.sorgu_tipi)
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as resp:
@@ -36,41 +39,10 @@ class SorguModal(discord.ui.Modal):
                     data = await resp.json()
                     embed = discord.Embed(title=f"📋 {self.sorgu_tipi} Sonucu", color=discord.Color.green())
                     
-                    # Veriyi türüne göre temizleyip ekrana bas
                     if self.sorgu_tipi == "Instagram":
                         embed.add_field(name="Ad Soyad", value=data.get("full_name", "Bilgi yok"), inline=False)
                         embed.add_field(name="Takipçi", value=str(data.get("followers", "0")), inline=True)
                         embed.add_field(name="Takip Edilen", value=str(data.get("following", "0")), inline=True)
                     else:
-                        # Diğerleri için veriyi daha düzenli string yap
-                        embed.description = f"```yaml\n{str(data)[:3500]}\n
-```"
-                        
-                    await interaction.followup.send(embed=embed, ephemeral=True)
-                else:
-                    await interaction.followup.send("❌ API hatası veya sonuç bulunamadı.", ephemeral=True)
-
-class SorguSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="Instagram Sorgu", value="Instagram", emoji="📸"),
-            discord.SelectOption(label="Domain Sorgu", value="Domain", emoji="🌐"),
-            discord.SelectOption(label="Email Sorgu", value="Email", emoji="📧"),
-        ]
-        super().__init__(placeholder="Sorgu tipi seçin...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(SorguModal(self.values[0]))
-
-@bot.tree.command(name="sorgula", description="Sorgu menüsünü açar")
-async def sorgula(interaction: discord.Interaction):
-    view = discord.ui.View()
-    view.add_item(SorguSelect())
-    await interaction.response.send_message("Lütfen bir sorgu tipi seçin:", view=view, ephemeral=True)
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f'{bot.user} aktif!')
-
-bot.run(os.environ['SORGU_BOT_TOKEN'])
+                        embed.description = f"
+http://googleusercontent.com/immersive_entry_chip/
