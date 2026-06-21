@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 from flask import Flask
 
 # --- 1. RENDER İÇİN ARKA PLAN FLASK SERVER ---
@@ -23,21 +23,41 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- 3. MODALLAR (AÇILIR PENCERELER) ---
+# --- 3. AUTO-PING (KEEP-ALIVE) SİSTEMİ ---
+# Render'ın ücretsiz planda uyku moduna geçmesini önlemek için 10 dakikada bir çalışır.
+@tasks.loop(minutes=10)
+async def keep_alive_ping():
+    # Render, Web Service projelerine otomatik olarak RENDER_EXTERNAL_URL değişkenini tanımlar.
+    self_url = os.environ.get("RENDER_EXTERNAL_URL")
+    if not self_url:
+        print("[Keep-Alive] RENDER_EXTERNAL_URL bulunamadı, ping işlemi atlanıyor.")
+        return
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(self_url, timeout=10) as resp:
+                print(f"[Keep-Alive] Kendi kendine ping başarılı! Durum Kodu: {resp.status}")
+        except Exception as e:
+            print(f"[Keep-Alive] Ping atılırken hata oluştu: {e}")
+
+@keep_alive_ping.before_loop
+async def before_keep_alive_ping():
+    await bot.wait_until_ready()
+
+# --- 4. MODALLAR (AÇILIR PENCERELER) ---
 
 # Instagram Sorgu Penceresi
 class InstagramModal(discord.ui.Modal, title="📸 Instagram Sorgulama"):
     username = discord.ui.TextInput(label="Instagram Kullanıcı Adı", placeholder="Örn: rte", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True) # Botun düşünme süresi
+        await interaction.response.defer(ephemeral=True)
         url = f"https://cc-3t5u.onrender.com/inslookup.php?username={self.username.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url, timeout=15) as resp:
                     sonuc = await resp.text()
-                    # Hata almamak için güvenli üçlü tırnak (triple quotes) yapısına geçildi
                     mesaj = f"""📸 **{self.username.value}** için Instagram Sonucu:
 ```json
 {sonuc[:1900]}
@@ -87,10 +107,10 @@ class EmailSpamModal(discord.ui.Modal, title="📧 Email Spam Gönderici"):
                 await interaction.followup.send(f"❌ API Hatası Oluştu: {str(e)}", ephemeral=True)
 
 
-# --- 4. GÖRSEL BUTONLAR MENÜSÜ (VIEW) ---
+# --- 5. GÖRSEL BUTONLAR MENÜSÜ (VIEW) ---
 class SorguPaneli(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) # Butonların süresi dolmasın, hep aktif kalsın
+        super().__init__(timeout=None)
 
     @discord.ui.button(label="Instagram Sorgu", style=discord.ButtonStyle.danger, emoji="📸", row=0)
     async def instagram_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -105,10 +125,16 @@ class SorguPaneli(discord.ui.View):
         await interaction.response.send_modal(EmailSpamModal())
 
 
-# --- 5. BOT ETKİNLİKLERİ VE SLASH KOMUTU ---
+# --- 6. BOT ETKİNLİKLERİ VE SLASH KOMUTU ---
 @bot.event
 async def on_ready():
     print(f"[{bot.user.name}] Başarıyla giriş yaptı ve komutlar senkronize ediliyor...")
+    
+    # Otomatik uyanık kalma görevini başlatıyoruz
+    if not keep_alive_ping.is_running():
+        keep_alive_ping.start()
+        print("🚀 [Keep-Alive] Otomatik ping döngüsü aktif hale getirildi!")
+
     try:
         synced = await bot.tree.sync()
         print(f"✅ {len(synced)} adet slash komutu başarıyla senkronize edildi!")
@@ -119,7 +145,6 @@ async def on_ready():
 @bot.tree.command(name="sorgula", description="Sorgulama panelini ve butonları açar.")
 async def sorgula(interaction: discord.Interaction):
     view = SorguPaneli()
-    # ephemeral=True sayesinde mesajı SADECE komutu yazan kişi görebilir.
     await interaction.response.send_message(
         "🔮 **Sorgu ve İşlem Paneline Hoş Geldiniz!**\nLütfen yapmak istediğiniz işlemi aşağıdaki butonları kullanarak seçin:", 
         view=view, 
@@ -127,14 +152,12 @@ async def sorgula(interaction: discord.Interaction):
     )
 
 
-# --- 6. ANA ÇALIŞTIRICI ---
+# --- 7. ANA ÇALIŞTIRICI ---
 if __name__ == "__main__":
-    # Flask web sunucusunu Render için ayrı bir kolda başlatıyoruz
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Render panelinden ekleyeceğiniz DISCORD_TOKEN ile botu çalıştırır
     TOKEN = os.environ.get("DISCORD_TOKEN")
     if TOKEN:
         bot.run(TOKEN)
