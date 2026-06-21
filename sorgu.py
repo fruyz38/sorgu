@@ -57,14 +57,19 @@ def format_api_response(title, raw_text):
             
             # Farklı bir JSON çıktısı varsa temizlenmiş halini estetik olarak yazdır
             pretty_json = json.dumps(data, indent=4, ensure_ascii=False)
-            return f"✅ **{title} Sonucu:**\n```json\n{pretty_json[:1800]}\n
-```"
+            return f"""✅ **{title} Sonucu:**
+```json
+{pretty_json[:1800]}
+```"""
             
     except Exception:
         # Eğer gelen yanıt düz metinse direkt kırpıp gönder
         pass
     
-    return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
+    return f"""✅ **{title} Sonucu:**
+```json
+{raw_text[:1900]}
+```"""
 
 # --- 4. AUTO-PING (KEEP-ALIVE) SİSTEMİ ---
 # Render'ın ücretsiz planda uyku moduna geçmesini önlemek için 10 dakikada bir çalışır.
@@ -94,7 +99,7 @@ class InstagramModal(discord.ui.Modal, title="📸 Instagram Sorgulama"):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        url = f"https://cc-3t5u.onrender.com/inslookup.php?username={self.username.value}"
+        url = f"[https://cc-3t5u.onrender.com/inslookup.php?username=](https://cc-3t5u.onrender.com/inslookup.php?username=){self.username.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -111,7 +116,7 @@ class DomainModal(discord.ui.Modal, title="🌐 Domain Whois Sorgulama"):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        url = f"https://cc-3t5u.onrender.com/whoisapi.php?domain={self.domain.value}"
+        url = f"[https://cc-3t5u.onrender.com/whoisapi.php?domain=](https://cc-3t5u.onrender.com/whoisapi.php?domain=){self.domain.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -128,7 +133,7 @@ class EmailSpamModal(discord.ui.Modal, title="📧 Email Spam Gönderici"):
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        url = f"https://cc-3t5u.onrender.com/emailspam.php?email={self.email.value}"
+        url = f"[https://cc-3t5u.onrender.com/emailspam.php?email=](https://cc-3t5u.onrender.com/emailspam.php?email=){self.email.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
