@@ -5,26 +5,36 @@ import os
 from flask import Flask
 from threading import Thread
 
-# Web sunucusu (Render'da botun kapanmaması için)
+# 1. Web Sunucusu (Render üzerinde botun 7/24 aktif kalmasını sağlar)
 app = Flask('')
 @app.route('/')
-def home(): return "Sorgu botu aktif!"
-def run(): app.run(host='0.0.0.0', port=8081)
+def home(): 
+    return "Sorgu botu aktif!"
+
+def run(): 
+    app.run(host='0.0.0.0', port=8081)
+
 Thread(target=run).start()
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# 2. Sorgu Bilgisi Giriş Ekranı (Modal/Pencere)
 class SorguModal(discord.ui.Modal):
     def __init__(self, sorgu_tipi):
         super().__init__(title=f'{sorgu_tipi} Sorgu Paneli')
         self.sorgu_tipi = sorgu_tipi
-        self.input = discord.ui.TextInput(label='Sorgulanacak Değer', placeholder='Değeri girin...', required=True)
+        self.input = discord.ui.TextInput(
+            label='Sorgulanacak Değer', 
+            placeholder='Değeri buraya girin...', 
+            required=True
+        )
         self.add_item(self.input)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.send_message(f"🔍 `{self.input.value}` aranıyor...", ephemeral=True)
         val = self.input.value
+        
         urls = {
             "Instagram": f"https://cc-3t5u.onrender.com/inslookup.php?username={val}",
             "Email": f"https://cc-3t5u.onrender.com/emailspam.php?email={val}",
@@ -44,6 +54,6 @@ class SorguModal(discord.ui.Modal):
                             embed.add_field(name="Takipçi", value=str(data.get("followers", "0")), inline=True)
                             embed.add_field(name="Takip Edilen", value=str(data.get("following", "0")), inline=True)
                         else:
-                            # Hatalı olan kırık link satırı tamamen düzeltildi
+                            # Hatalı olan kırık link satırı tamamen temizlendi
                             embed.description = f"
 http://googleusercontent.com/immersive_entry_chip/0
