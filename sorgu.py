@@ -26,16 +26,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # --- 3. AKILLI API VERİ TEMİZLEYİCİ VE FORMATLAYICI ---
 def format_api_response(title, raw_text):
+    # Kodun chat ekranında bölünmesini engellemek için dinamik tırnak tanımı
+    ucl_tirnak = "```"
     try:
-        # Gelen veriyi JSON olarak ayıklamayı dene
         data = json.loads(raw_text)
         
         if isinstance(data, dict):
-            # Ekranı dolduran uzun ve gereksiz kısımları temizliyoruz
             data.pop("raw_response", None)
             data.pop("cipher", None)
             
-            # Instagram/Hesap sorgu formatı geldiyse özelleştirilmiş liste yap
             if "username" in data or "contact_points" in data:
                 msg = f"🔍 **{title} Sorgu Sonucu:**\n\n"
                 if "username" in data:
@@ -50,42 +49,31 @@ def format_api_response(title, raw_text):
                         value = cp.get("contact_point", "-")
                         title_str = cp.get("title", "")
                         
-                        # E-posta veya Telefon durumuna göre emoji ata
                         emoji = "📧" if cp_type == "EMAIL" else "📱"
                         msg += f"• {emoji} **{cp_type}:** `{value}` *({title_str})*\n"
                 return msg
             
-            # Farklı bir JSON çıktısı varsa temizlenmiş halini estetik olarak yazdır
             pretty_json = json.dumps(data, indent=4, ensure_ascii=False)
-            return f"""✅ **{title} Sonucu:**
-```json
-{pretty_json[:1800]}
-```"""
+            return f"✅ **{title} Sonucu:**\n{ucl_tirnak}json\n{pretty_json[:1800]}\n{ucl_tirnak}"
             
     except Exception:
-        # Eğer gelen yanıt düz metinse direkt kırpıp gönder
         pass
     
-    return f"""✅ **{title} Sonucu:**
-```json
-{raw_text[:1900]}
-```"""
+    return f"✅ **{title} Sonucu:**\n{ucl_tirnak}json\n{raw_text[:1900]}\n{ucl_tirnak}"
 
 # --- 4. AUTO-PING (KEEP-ALIVE) SİSTEMİ ---
-# Render'ın ücretsiz planda uyku moduna geçmesini önlemek için 10 dakikada bir çalışır.
 @tasks.loop(minutes=10)
 async def keep_alive_ping():
     self_url = os.environ.get("RENDER_EXTERNAL_URL")
     if not self_url:
-        print("[Keep-Alive] RENDER_EXTERNAL_URL bulunamadı, ping işlemi atlanıyor.")
         return
     
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(self_url, timeout=10) as resp:
-                print(f"[Keep-Alive] Kendi kendine ping başarılı! Durum Kodu: {resp.status}")
+                print(f"[Keep-Alive] Ping basarili: {resp.status}")
         except Exception as e:
-            print(f"[Keep-Alive] Ping atılırken hata oluştu: {e}")
+            print(f"[Keep-Alive] Ping hatasi: {e}")
 
 @keep_alive_ping.before_loop
 async def before_keep_alive_ping():
@@ -93,13 +81,13 @@ async def before_keep_alive_ping():
 
 # --- 5. MODALLAR (AÇILIR PENCERELER) ---
 
-# Instagram Sorgu Penceresi
 class InstagramModal(discord.ui.Modal, title="📸 Instagram Sorgulama"):
     username = discord.ui.TextInput(label="Instagram Kullanıcı Adı", placeholder="Örn: rte", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        url = f"[https://cc-3t5u.onrender.com/inslookup.php?username=](https://cc-3t5u.onrender.com/inslookup.php?username=){self.username.value}"
+        base_url = "https://cc-3t5u.onrender.com/inslookup.php"
+        url = f"{base_url}?username={self.username.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -110,13 +98,13 @@ class InstagramModal(discord.ui.Modal, title="📸 Instagram Sorgulama"):
             except Exception as e:
                 await interaction.followup.send(f"❌ API Hatası Oluştu: {str(e)}", ephemeral=True)
 
-# Domain Sorgu Penceresi
 class DomainModal(discord.ui.Modal, title="🌐 Domain Whois Sorgulama"):
     domain = discord.ui.TextInput(label="Domain Adresi", placeholder="Örn: exxen.com", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        url = f"[https://cc-3t5u.onrender.com/whoisapi.php?domain=](https://cc-3t5u.onrender.com/whoisapi.php?domain=){self.domain.value}"
+        base_url = "https://cc-3t5u.onrender.com/whoisapi.php"
+        url = f"{base_url}?domain={self.domain.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -127,13 +115,13 @@ class DomainModal(discord.ui.Modal, title="🌐 Domain Whois Sorgulama"):
             except Exception as e:
                 await interaction.followup.send(f"❌ API Hatası Oluştu: {str(e)}", ephemeral=True)
 
-# Email Spam Penceresi
 class EmailSpamModal(discord.ui.Modal, title="📧 Email Spam Gönderici"):
     email = discord.ui.TextInput(label="Hedef E-Posta Adresi", placeholder="Örn: ornek@mail.com", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        url = f"[https://cc-3t5u.onrender.com/emailspam.php?email=](https://cc-3t5u.onrender.com/emailspam.php?email=){self.email.value}"
+        base_url = "https://cc-3t5u.onrender.com/emailspam.php"
+        url = f"{base_url}?email={self.email.value}"
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -166,25 +154,23 @@ class SorguPaneli(discord.ui.View):
 # --- 7. BOT ETKİNLİKLERİ VE SLASH KOMUTU ---
 @bot.event
 async def on_ready():
-    print(f"[{bot.user.name}] Başarıyla giriş yaptı ve komutlar senkronize ediliyor...")
+    print(f"[{bot.user.name}] Basariyla giris yapti.")
     
     if not keep_alive_ping.is_running():
         keep_alive_ping.start()
-        print("🚀 [Keep-Alive] Otomatik ping döngüsü aktif hale getirildi!")
 
     try:
         synced = await bot.tree.sync()
-        print(f"✅ {len(synced)} adet slash komutu başarıyla senkronize edildi!")
+        print(f"✅ {len(synced)} adet slash komutu senkronize edildi!")
     except Exception as e:
         print(f"❌ Komut senkronizasyon hatası: {e}")
 
-# /sorgula komutu
 @bot.tree.command(name="sorgula", description="Sorgulama panelini ve butonları açar.")
 async def sorgula(interaction: discord.Interaction):
     view = SorguPaneli()
     
     embed = discord.Embed(
-        title="🚨 Zynex Sxrgu Sistemine Hoşgeldin!",
+        title="🪪 Zynex Sorgu Sistemine Hoşgeldin!",
         description="""Bu sistem üzerinden güvenli ve hızlı bir şekilde entegre apileri kullanabilirsiniz.
 
 🔒 **GİZLİLİK GARANTİSİ:**
