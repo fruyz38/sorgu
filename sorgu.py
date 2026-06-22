@@ -29,7 +29,7 @@ def format_api_response(title: str, raw_text: str):
     if any(x in raw_text.lower() for x in ["cloudflare", "challenge", "just a moment", "<!doctype html>"]):
         return discord.Embed(
             title=f"❌ {title} Sonucu",
-            description="API Cloudflare koruması altında.\nBirkaç dakika sonra tekrar deneyin.",
+            description="Cloudflare koruması devam ediyor.\nBiraz sonra tekrar dene.",
             color=discord.Color.red()
         )
 
@@ -38,6 +38,7 @@ def format_api_response(title: str, raw_text: str):
         if not isinstance(data, dict):
             return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
 
+        # Gereksiz alanları temizle
         for key in ["telegram", "Telegram", "raw_response", "cipher", "success"]:
             data.pop(key, None)
 
@@ -52,19 +53,11 @@ def format_api_response(title: str, raw_text: str):
             elif isinstance(value, list):
                 embed.add_field(name=key.replace("_", " ").title(), value=f"{len(value)} adet bulundu", inline=False)
             else:
-                embed.add_field(
-                    name=key.replace("_", " ").title(),
-                    value=f"`{value}`",
-                    inline=len(str(value)) < 40
-                )
+                embed.add_field(name=key.replace("_", " ").title(), value=f"`{value}`", inline=len(str(value)) < 40)
         return embed
 
     except Exception:
-        return discord.Embed(
-            title=f"⚠️ {title} Sonucu",
-            description="API geçerli JSON döndürmedi.",
-            color=discord.Color.orange()
-        )
+        return discord.Embed(title=f"⚠️ {title} Sonucu", description="API yanıt veremedi.", color=discord.Color.orange())
 
 # --- 4. KEEP-ALIVE ---
 @tasks.loop(minutes=10)
@@ -81,7 +74,7 @@ async def keep_alive_ping():
 async def before_keep_alive_ping():
     await bot.wait_until_ready()
 
-# ====================== SORGU FONKSİYONU ======================
+# ====================== SORGU FONKSİYONU (X-Author eklendi) ======================
 async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
@@ -89,6 +82,8 @@ async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
         "Accept-Language": "tr-TR,tr;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://arastir.vip/",
+        "Origin": "https://arastir.vip",
+        "X-Author": "Zynex",          # ← Bu önemli!
     }
 
     async with aiohttp.ClientSession(headers=headers) as session:
@@ -115,13 +110,9 @@ class TcModal(discord.ui.Modal, title="🔍 TC Sorgula"):
 class AdSoyadModal(discord.ui.Modal, title="👤 Ad Soyad Sorgu"):
     ad = discord.ui.TextInput(label="Ad", placeholder="Ahmet", required=True)
     soyad = discord.ui.TextInput(label="Soyad", placeholder="Yılmaz", required=True)
-    il = discord.ui.TextInput(label="İl (Opsiyonel)", placeholder="İstanbul", required=False)
-    ilce = discord.ui.TextInput(label="İlçe (Opsiyonel)", placeholder="Kadıköy", required=False)
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         url = f"https://arastir.vip/api/adsoyad.php?adi={self.ad.value}&soyadi={self.soyad.value}"
-        if self.il.value: url += f"&il={self.il.value}"
-        if self.ilce.value: url += f"&ilce={self.ilce.value}"
         await sorgu_yap(interaction, "Ad Soyad Sorgu", url)
 
 class GsmToTcModal(discord.ui.Modal, title="📱 GSM → TC"):
@@ -202,7 +193,7 @@ async def on_ready():
         keep_alive_ping.start()
     try:
         await bot.tree.sync()
-        print("✅ Slash komutları senkronize edildi!")
+        print("✅ Komutlar yüklendi!")
     except Exception as e:
         print(f"Komut hatası: {e}")
 
