@@ -31,8 +31,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 def format_api_response(title: str, raw_text: str):
     try:
         print(f"API Yanıtı: {raw_text}")
+        data = json.loads(raw_text)  # <--- BU SATIRI MUTLAKA EKLEMELİSİN
+        
         if not isinstance(data, dict):
-            return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
+            return f"✅ **{title} Sonucu:**\n
 
         for key in ["telegram", "Telegram", "raw_response", "cipher", "success"]:
             data.pop(key, None)
