@@ -26,10 +26,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # --- 3. FORMATLAYICI ---
 def format_api_response(title: str, raw_text: str):
-    if any(x in raw_text.lower() for x in ["cloudflare", "challenge", "just a moment", "<!doctype html>", "attention required"]):
+    if any(x in raw_text.lower() for x in ["cloudflare", "challenge", "just a moment", "<!doctype html>"]):
         return discord.Embed(
             title=f"❌ {title} Sonucu",
-            description="**API Cloudflare koruması altında.**\nBirkaç dakika sonra tekrar deneyin.",
+            description="API Cloudflare koruması altında.\nBirkaç dakika sonra tekrar deneyin.",
             color=discord.Color.red()
         )
 
@@ -38,14 +38,14 @@ def format_api_response(title: str, raw_text: str):
         if not isinstance(data, dict):
             return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
 
-        temizlenecek = ["telegram", "Telegram", "raw_response", "cipher", "success"]
-        for key in temizlenecek:
+        # Gereksiz alanları temizle
+        for key in ["telegram", "Telegram", "raw_response", "cipher", "success"]:
             data.pop(key, None)
 
         embed = discord.Embed(title=f"✅ {title} Sonucu", color=discord.Color.green())
 
         for key, value in data.items():
-            if value is None or value == "" or value == [] or value == {}:
+            if not value:
                 continue
             if isinstance(value, dict):
                 field_text = "\n".join([f"**{k}:** `{v}`" for k, v in value.items() if v])
@@ -63,7 +63,7 @@ def format_api_response(title: str, raw_text: str):
     except Exception:
         return discord.Embed(
             title=f"⚠️ {title} Sonucu",
-            description="API'den beklenmeyen yanıt alındı.",
+            description="API geçerli JSON döndürmedi.",
             color=discord.Color.orange()
         )
 
@@ -71,32 +71,26 @@ def format_api_response(title: str, raw_text: str):
 @tasks.loop(minutes=10)
 async def keep_alive_ping():
     self_url = os.environ.get("RENDER_EXTERNAL_URL")
-    if not self_url:
-        return
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(self_url, timeout=10) as resp:
-                print(f"[Keep-Alive] Ping başarılı: {resp.status}")
-        except:
-            pass
+    if self_url:
+        async with aiohttp.ClientSession() as session:
+            try:
+                await session.get(self_url, timeout=10)
+            except:
+                pass
 
 @keep_alive_ping.before_loop
 async def before_keep_alive_ping():
     await bot.wait_until_ready()
 
-# ====================== GÜÇLENDİRİLMİŞ SORGU FONKSİYONU ======================
+# ====================== SORGU FONKSİYONU (Brotli + Headers) ======================
 async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8",
+        "Accept-Language": "tr-TR,tr;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://arastir.vip/",
         "Origin": "https://arastir.vip",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Dest": "empty",
-        "Connection": "keep-alive",
     }
 
     async with aiohttp.ClientSession(headers=headers) as session:
@@ -113,7 +107,6 @@ async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
             await interaction.followup.send(f"❌ API Hatası: {str(e)}", ephemeral=True)
 
 # ====================== MODALLAR ======================
-
 class TcModal(discord.ui.Modal, title="🔍 TC Sorgula"):
     tc = discord.ui.TextInput(label="TC Kimlik No", placeholder="11 haneli TC", required=True)
     async def on_submit(self, interaction: discord.Interaction):
@@ -225,7 +218,7 @@ class SorguPaneli(discord.ui.View):
     async def email_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(EmailSpamModal())
 
-# ====================== BOT ETKİNLİKLERİ ======================
+# ====================== ANA KOMUT ======================
 @bot.event
 async def on_ready():
     print(f"[{bot.user.name}] Başarıyla giriş yaptı.")
@@ -233,7 +226,7 @@ async def on_ready():
         keep_alive_ping.start()
     try:
         await bot.tree.sync()
-        print("✅ Slash komutları senkronize edildi!")
+        print("✅ Komutlar senkronize edildi!")
     except Exception as e:
         print(f"Komut hatası: {e}")
 
@@ -242,12 +235,12 @@ async def sorgula(interaction: discord.Interaction):
     view = SorguPaneli()
     embed = discord.Embed(
         title="🪪 Zynex Sorgu Paneli",
-        description="Aşağıdaki butonlardan istediğin sorguyu seç.",
+        description="Aşağıdaki butonlardan istediğini seç.",
         color=discord.Color.from_rgb(155, 29, 32)
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-# ====================== ANA ÇALIŞTIRICI ======================
+# ====================== ÇALIŞTIRICI ======================
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
