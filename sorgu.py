@@ -1,16 +1,14 @@
 import os
 import threading
-import asyncio
-import aiohttp
 import json
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from flask import Flask
+from curl_cffi import requests as cf_requests  # Cloudflare aşımı için temel kütüphane
 
 # --- 1. FLASK SERVER ---
 app = Flask(__name__)
-
 @app.route('/')
 def home():
     return "Bot 7/24 Aktif!"
@@ -26,17 +24,18 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # --- 3. FORMATLAYICI ---
 def format_api_response(title: str, raw_text: str):
+    # Cloudflare veya Hata kontrolü
     if any(x in raw_text.lower() for x in ["cloudflare", "challenge", "just a moment", "<!doctype html>", "attention required"]):
         return discord.Embed(
             title=f"❌ {title} Sonucu",
-            description="**Cloudflare Koruması Aktif**\nAPI şu anda bot isteklerini engelliyor.\nBirkaç dakika bekleyip tekrar dene.",
+            description="**Cloudflare Koruması Aktif**\nAPI şu anda istekleri engelliyor.",
             color=discord.Color.red()
         )
 
     try:
         data = json.loads(raw_text)
         if not isinstance(data, dict):
-            return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
+            return f"✅ **{title} Sonucu:**\n
 
         for key in ["telegram", "Telegram", "raw_response", "cipher", "success"]:
             data.pop(key, None)
