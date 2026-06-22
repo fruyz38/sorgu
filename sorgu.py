@@ -3,7 +3,7 @@ import threading
 import asyncio
 import json
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from flask import Flask
 from curl_cffi import requests as cf_requests
 
@@ -27,7 +27,7 @@ def format_api_response(title: str, raw_text: str):
     if any(x in raw_text.lower() for x in ["cloudflare", "challenge", "just a moment", "<!doctype html>", "attention required"]):
         return discord.Embed(
             title=f"❌ {title} Sonucu",
-            description="**Cloudflare Koruması Aktif**\nAPI şu anda bot isteklerini engelliyor.",
+            description="**Cloudflare Koruması Aktif**\nSunucu IP'niz API tarafından kısıtlanıyor.",
             color=discord.Color.red()
         )
 
@@ -45,16 +45,23 @@ def format_api_response(title: str, raw_text: str):
     except:
         return discord.Embed(title=f"⚠️ {title} Sonucu", description="API geçerli veri döndürmedi.", color=discord.Color.orange())
 
-# --- 4. SORGU FONKSİYONU ---
+# --- 4. SORGU FONKSİYONU (PROXY EKLENDİ) ---
 async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         "Referer": "https://arastir.vip/",
         "X-Author": "Zynex"
     }
+    
+    # Proxy adresini buraya ekleyebilirsin: "http://kullanici:sifre@ip:port"
+    proxy = None 
+    
     try:
         def fetch():
-            return cf_requests.get(url, headers=headers, impersonate="chrome120", timeout=20)
+            # Eğer proxy kullanacaksan proxy=proxy parametresini aktif et
+            return cf_requests.get(url, headers=headers, impersonate="chrome120", 
+                                   proxies={"http": proxy, "https": proxy} if proxy else None, 
+                                   timeout=20)
         
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(None, fetch)
