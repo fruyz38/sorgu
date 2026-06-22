@@ -33,11 +33,11 @@ def format_api_response(title: str, raw_text: str):
         print(f"API Yanıtı: {raw_text}")
         data = json.loads(raw_text)  # <--- BU SATIRI MUTLAKA EKLEMELİSİN
         
-        if not isinstance(data, dict):
-    return (
-    f"✅ **{title} Sonucu:**\n\n"
-    f"```json\n{raw_text[:1900]}\n```"
-)
+       if not isinstance(data, dict):
+            return (
+                f"✅ **{title} Sonucu:**\n\n"
+                f"```json\n{raw_text[:1900]}\n```"
+            )
         for key in ["telegram", "Telegram", "raw_response", "cipher", "success"]:
             data.pop(key, None)
 
