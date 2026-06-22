@@ -24,38 +24,30 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- 3. GELİŞMİŞ FORMATLAYICI (HTML & Hata tespiti) ---
+# --- 3. GELİŞMİŞ FORMATLAYICI ---
 def format_api_response(title: str, raw_text: str):
-    # Cloudflare veya HTML tespiti
-    if "<!DOCTYPE html>" in raw_text or "cloudflare" in raw_text.lower() or "<html" in raw_text.lower():
+    if "<!DOCTYPE html>" in raw_text or "cloudflare" in raw_text.lower() or "challenge" in raw_text.lower():
         return discord.Embed(
             title=f"❌ {title} Sonucu",
-            description="**API şu anda Cloudflare koruması altında.**\n\nBiraz sonra tekrar deneyin.",
+            description="**API Cloudflare koruması altında.**\nBiraz sonra tekrar deneyin.",
             color=discord.Color.red()
         )
 
     try:
         data = json.loads(raw_text)
-        
         if not isinstance(data, dict):
             return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
 
-        # İstenmeyen alanları temizle
-        temizlenecek = ["telegram", "Telegram", "tele", "raw_response", "cipher", "success", "status_code"]
+        temizlenecek = ["telegram", "Telegram", "tele", "raw_response", "cipher", "success"]
         for key in temizlenecek:
             data.pop(key, None)
             data.pop(key.lower(), None)
-            data.pop(key.upper(), None)
 
-        embed = discord.Embed(
-            title=f"✅ {title} Sonucu",
-            color=discord.Color.green()
-        )
+        embed = discord.Embed(title=f"✅ {title} Sonucu", color=discord.Color.green())
 
         for key, value in data.items():
             if value is None or value == "" or value == [] or value == {}:
                 continue
-                
             if isinstance(value, dict):
                 field_text = "\n".join([f"**{k}:** `{v}`" for k, v in value.items() if v])
                 embed.add_field(name=key.replace("_", " ").title(), value=field_text[:1024] or "-", inline=False)
@@ -67,14 +59,12 @@ def format_api_response(title: str, raw_text: str):
                     value=f"`{value}`", 
                     inline=len(str(value)) < 40
                 )
-
         return embed
 
     except Exception:
-        # JSON değilse ve HTML de değilse
         return discord.Embed(
             title=f"⚠️ {title} Sonucu",
-            description="API'den beklenmeyen yanıt alındı.",
+            description="API'den geçerli yanıt alınamadı.",
             color=discord.Color.orange()
         )
 
@@ -95,11 +85,18 @@ async def keep_alive_ping():
 async def before_keep_alive_ping():
     await bot.wait_until_ready()
 
-# ====================== ORTAK SORGU ======================
+# ====================== ORTAK SORGU (Headers eklendi) ======================
 async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
-    async with aiohttp.ClientSession() as session:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "tr-TR,tr;q=0.9",
+        "Referer": "https://arastir.vip",
+    }
+    
+    async with aiohttp.ClientSession(headers=headers) as session:
         try:
-            async with session.get(url, timeout=25) as resp:
+            async with session.get(url, timeout=30) as resp:
                 sonuc = await resp.text()
                 mesaj = format_api_response(title, sonuc)
                 
@@ -110,8 +107,7 @@ async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
         except Exception as e:
             await interaction.followup.send(f"❌ Bağlantı Hatası: {str(e)}", ephemeral=True)
 
-# ====================== MODALLAR ======================
-# (Tüm modallar aynı kaldı - yer tasarrufu için kısalttım)
+# ====================== MODALLAR (Kısaltıldı) ======================
 class TcModal(discord.ui.Modal, title="🔍 TC Sorgula"):
     tc = discord.ui.TextInput(label="TC Kimlik No", placeholder="11 haneli TC", required=True)
     async def on_submit(self, interaction: discord.Interaction):
@@ -166,26 +162,11 @@ class InstagramModal(discord.ui.Modal, title="📸 Instagram Sorgulama"):
         url = f"https://cc-3t5u.onrender.com/inslookup.php?username={self.username.value}"
         await sorgu_yap(interaction, "Instagram Sorgu", url)
 
-class DomainModal(discord.ui.Modal, title="🌐 Domain Whois"):
-    domain = discord.ui.TextInput(label="Domain Adresi", placeholder="Örn: exxen.com", required=True)
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        url = f"https://cc-3t5u.onrender.com/whoisapi.php?domain={self.domain.value}"
-        await sorgu_yap(interaction, "Domain Whois", url)
-
-class EmailSpamModal(discord.ui.Modal, title="📧 Email Spam"):
-    email = discord.ui.TextInput(label="Hedef E-Posta", placeholder="ornek@mail.com", required=True)
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        url = f"https://cc-3t5u.onrender.com/emailspam.php?email={self.email.value}"
-        await sorgu_yap(interaction, "Email Spam", url)
-
 # ====================== BUTON PANELİ ======================
 class SorguPaneli(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # 1. Satır
     @discord.ui.button(label="TC Sorgula", style=discord.ButtonStyle.primary, emoji="🔍", row=0)
     async def tc_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TcModal())
@@ -206,7 +187,6 @@ class SorguPaneli(discord.ui.View):
     async def sulale_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(SulaleModal())
 
-    # 2. Satır
     @discord.ui.button(label="Adres", style=discord.ButtonStyle.primary, emoji="🏠", row=1)
     async def adres_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(AdresModal())
@@ -214,14 +194,6 @@ class SorguPaneli(discord.ui.View):
     @discord.ui.button(label="Instagram", style=discord.ButtonStyle.primary, emoji="📸", row=1)
     async def instagram_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(InstagramModal())
-
-    @discord.ui.button(label="Domain", style=discord.ButtonStyle.primary, emoji="🌐", row=1)
-    async def domain_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(DomainModal())
-
-    @discord.ui.button(label="Email Spam", style=discord.ButtonStyle.primary, emoji="📧", row=1)
-    async def email_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(EmailSpamModal())
 
 # ====================== ANA KOMUT ======================
 @bot.event
@@ -231,7 +203,6 @@ async def on_ready():
         keep_alive_ping.start()
     try:
         await bot.tree.sync()
-        print("✅ Slash komutları senkronize edildi!")
     except Exception as e:
         print(f"Komut hatası: {e}")
 
@@ -254,5 +225,3 @@ if __name__ == "__main__":
     TOKEN = os.environ.get("DISCORD_TOKEN")
     if TOKEN:
         bot.run(TOKEN)
-    else:
-        print("❌ DISCORD_TOKEN bulunamadı!")
