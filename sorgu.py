@@ -8,7 +8,17 @@ from discord.ext import commands, tasks
 import logging
 import sys
 import io
+from flask import Flask
+from threading import Thread
 
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot aktif!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', write_through=True)
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', write_through=True)
 
@@ -168,7 +178,11 @@ async def sorgula(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 if __name__ == "__main__":
-    # TOKEN değişkenini artık kod içerisinden değil, sistem ortamından (Render'dan) çekecek
+    # Web sunucusunu arka planda başlat
+    t = Thread(target=run)
+    t.start()
+    
+    # Token'ı environment variable olarak al
     TOKEN = os.getenv("DISCORD_TOKEN")
     
     if TOKEN:
