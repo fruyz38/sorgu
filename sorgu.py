@@ -27,10 +27,9 @@ def format_api_response(title: str, raw_text: str):
     if any(x in raw_text.lower() for x in ["cloudflare", "challenge", "just a moment", "<!doctype html>", "attention required"]):
         return discord.Embed(
             title=f"❌ {title} Sonucu",
-            description="**Cloudflare Koruması Aktif**\nSunucu IP'niz API tarafından kısıtlanıyor.",
+            description="**Cloudflare Koruması Aktif.**\nSunucu IP'niz API tarafından engellenmiş. Lütfen 'proxy' değişkenine geçerli bir residential proxy adresi girin.",
             color=discord.Color.red()
         )
-
     try:
         data = json.loads(raw_text)
         embed = discord.Embed(title=f"✅ {title} Sonucu", color=discord.Color.green())
@@ -43,9 +42,9 @@ def format_api_response(title: str, raw_text: str):
                 embed.add_field(name=key.replace("_", " ").title(), value=f"`{value}`", inline=len(str(value)) < 40)
         return embed
     except:
-        return discord.Embed(title=f"⚠️ {title} Sonucu", description="API geçerli veri döndürmedi.", color=discord.Color.orange())
+        return discord.Embed(title=f"⚠️ {title} Sonucu", description="API verisi işlenemedi.", color=discord.Color.orange())
 
-# --- 4. SORGU FONKSİYONU (PROXY EKLENDİ) ---
+# --- 4. SORGU FONKSİYONU ---
 async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
@@ -53,15 +52,14 @@ async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
         "X-Author": "Zynex"
     }
     
-    # Proxy adresini buraya ekleyebilirsin: "http://kullanici:sifre@ip:port"
+    # !!! ÖNEMLİ: Proxy adresini buraya ekleyin (örn: http://kullanici:sifre@ip:port)
     proxy = None 
     
     try:
         def fetch():
-            # Eğer proxy kullanacaksan proxy=proxy parametresini aktif et
-            return cf_requests.get(url, headers=headers, impersonate="chrome120", 
-                                   proxies={"http": proxy, "https": proxy} if proxy else None, 
-                                   timeout=20)
+            # Proxy aktif edildi:
+            proxies = {"http": proxy, "https": proxy} if proxy else None
+            return cf_requests.get(url, headers=headers, impersonate="chrome120", proxies=proxies, timeout=20)
         
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(None, fetch)
@@ -81,9 +79,14 @@ class TcModal(discord.ui.Modal, title="🔍 TC Sorgula"):
 class AdSoyadModal(discord.ui.Modal, title="👤 Ad Soyad Sorgu"):
     ad = discord.ui.TextInput(label="Ad", required=True)
     soyad = discord.ui.TextInput(label="Soyad", required=True)
+    sehir = discord.ui.TextInput(label="Şehir (İsteğe Bağlı)", required=False)
+    ilce = discord.ui.TextInput(label="İlçe (İsteğe Bağlı)", required=False)
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        await sorgu_yap(interaction, "Ad Soyad Sorgu", f"https://arastir.vip/api/adsoyad.php?adi={self.ad.value}&soyadi={self.soyad.value}")
+        url = f"https://arastir.vip/api/adsoyad.php?adi={self.ad.value}&soyadi={self.soyad.value}"
+        if self.sehir.value: url += f"&sehir={self.sehir.value}"
+        if self.ilce.value: url += f"&ilce={self.ilce.value}"
+        await sorgu_yap(interaction, "Ad Soyad Sorgu", url)
 
 class GsmToTcModal(discord.ui.Modal, title="📱 GSM → TC"):
     gsm = discord.ui.TextInput(label="GSM Numara", required=True)
