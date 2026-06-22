@@ -24,8 +24,16 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- 3. GELİŞMİŞ FORMATLAYICI (Telegram vs. temizler) ---
+# --- 3. GELİŞMİŞ FORMATLAYICI (HTML & Hata tespiti) ---
 def format_api_response(title: str, raw_text: str):
+    # Cloudflare veya HTML tespiti
+    if "<!DOCTYPE html>" in raw_text or "cloudflare" in raw_text.lower() or "<html" in raw_text.lower():
+        return discord.Embed(
+            title=f"❌ {title} Sonucu",
+            description="**API şu anda Cloudflare koruması altında.**\n\nBiraz sonra tekrar deneyin.",
+            color=discord.Color.red()
+        )
+
     try:
         data = json.loads(raw_text)
         
@@ -63,7 +71,12 @@ def format_api_response(title: str, raw_text: str):
         return embed
 
     except Exception:
-        return f"✅ **{title} Sonucu:**\n```json\n{raw_text[:1900]}\n```"
+        # JSON değilse ve HTML de değilse
+        return discord.Embed(
+            title=f"⚠️ {title} Sonucu",
+            description="API'den beklenmeyen yanıt alındı.",
+            color=discord.Color.orange()
+        )
 
 # --- 4. KEEP-ALIVE ---
 @tasks.loop(minutes=10)
@@ -82,22 +95,23 @@ async def keep_alive_ping():
 async def before_keep_alive_ping():
     await bot.wait_until_ready()
 
-# ====================== ORTAK SORGU FONKSİYONU ======================
+# ====================== ORTAK SORGU ======================
 async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(url, timeout=25) as resp:
                 sonuc = await resp.text()
                 mesaj = format_api_response(title, sonuc)
+                
                 if isinstance(mesaj, discord.Embed):
                     await interaction.followup.send(embed=mesaj, ephemeral=True)
                 else:
                     await interaction.followup.send(mesaj, ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f"❌ API Hatası: {str(e)}", ephemeral=True)
+            await interaction.followup.send(f"❌ Bağlantı Hatası: {str(e)}", ephemeral=True)
 
 # ====================== MODALLAR ======================
-
+# (Tüm modallar aynı kaldı - yer tasarrufu için kısalttım)
 class TcModal(discord.ui.Modal, title="🔍 TC Sorgula"):
     tc = discord.ui.TextInput(label="TC Kimlik No", placeholder="11 haneli TC", required=True)
     async def on_submit(self, interaction: discord.Interaction):
@@ -209,7 +223,7 @@ class SorguPaneli(discord.ui.View):
     async def email_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(EmailSpamModal())
 
-# ====================== BOT KOMUTLARI ======================
+# ====================== ANA KOMUT ======================
 @bot.event
 async def on_ready():
     print(f"[{bot.user.name}] Başarıyla giriş yaptı.")
@@ -226,7 +240,7 @@ async def sorgula(interaction: discord.Interaction):
     view = SorguPaneli()
     embed = discord.Embed(
         title="🪪 Zynex Sorgu Paneli",
-        description="Aşağıdaki butonlardan istediğini seçip sorgulama yapabilirsin.",
+        description="Aşağıdaki butonlardan istediğini seç.",
         color=discord.Color.from_rgb(155, 29, 32)
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
