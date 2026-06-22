@@ -62,7 +62,7 @@ def format_api_response(title: str, raw_text: str):
     except Exception:
         return discord.Embed(
             title=f"⚠️ {title} Sonucu",
-            description="API geçerli veri döndürmedi.",
+            description="API geçerli JSON döndürmedi.",
             color=discord.Color.orange()
         )
 
@@ -93,7 +93,7 @@ async def sorgu_yap(interaction: discord.Interaction, title: str, url: str):
 
     async with aiohttp.ClientSession(headers=headers) as session:
         try:
-            async with session.get(url, timeout=35) as resp:
+            async with session.get(url, timeout=40) as resp:
                 sonuc = await resp.text()
                 mesaj = format_api_response(title, sonuc)
                 
@@ -202,7 +202,7 @@ async def on_ready():
         keep_alive_ping.start()
     try:
         await bot.tree.sync()
-        print("✅ Komutlar yüklendi!")
+        print("✅ Slash komutları senkronize edildi!")
     except Exception as e:
         print(f"Komut hatası: {e}")
 
