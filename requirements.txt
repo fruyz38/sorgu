@@ -1,4 +1,4 @@
 discord.py
-aiohttp
+curl_cffi
 flask
 brotli
